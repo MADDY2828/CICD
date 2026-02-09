@@ -1,0 +1,57 @@
+version: 0.2
+
+# Buildspec for AWS CodeBuild to build a Docker image and push to ECR.
+# Notes:
+# - Ensure the CodeBuild project has "Privileged" (Docker in Docker) enabled.
+# - Set the CodeBuild environment variable ECR_REPOSITORY (or edit the default below).
+# - AWS credentials are provided by the CodeBuild service role.
+
+env:
+  variables:
+    # Change these defaults in the CodeBuild project environment if needed
+    ECR_REPOSITORY: "cicd-app"
+    IMAGE_TAG: "latest"
+
+phases:
+  pre_build:
+    commands:
+      - echo "Starting pre_build phase"
+      - echo "AWS CLI version: $(aws --version 2>&1)"
+      # Determine account id and login to ECR
+      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - REPOSITORY_URI=$ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPOSITORY
+      - echo "Repository URI: $REPOSITORY_URI"
+      # Create the repository if it doesn't exist (idempotent)
+      - |
+        if ! aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" --region $AWS_DEFAULT_REGION >/dev/null 2>&1; then
+          echo "Creating ECR repository: $ECR_REPOSITORY"
+          aws ecr create-repository --repository-name "$ECR_REPOSITORY" --region $AWS_DEFAULT_REGION >/dev/null || true
+        else
+          echo "ECR repository $ECR_REPOSITORY already exists"
+        fi
+
+  build:
+    commands:
+      - echo "Build started on `date`"
+      - echo "Building the Docker image $ECR_REPOSITORY:$IMAGE_TAG"
+      - docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
+      - echo "Tagging image with ECR URI"
+      - docker tag $ECR_REPOSITORY:$IMAGE_TAG $REPOSITORY_URI:$IMAGE_TAG
+
+  post_build:
+    commands:
+      - echo "Pushing image to ECR: $REPOSITORY_URI:$IMAGE_TAG"
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - echo "Creating imagedefinitions.json for CodeDeploy/ECS"
+      - printf '[{"name":"%s","imageUri":"%s"}]' "$ECR_REPOSITORY" "$REPOSITORY_URI:$IMAGE_TAG" > imagedefinitions.json
+      - echo "Build completed on `date`"
+
+artifacts:
+  files:
+    - imagedefinitions.json
+
+# Optional cache to speed up npm installs across builds (if your project uses npm)
+cache:
+  paths:
+    - '/root/.npm/**/*'
