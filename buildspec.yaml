@@ -43,11 +43,4 @@ cache:
   paths:
     - '/root/.npm/**/*'
     - '/root/.cache/pip/**/*'
-    timeout-in-minutes: 60
-
-    reports:
-      unit-tests:
-        files:
-          - 'test-results/**/*.xml'
-        base-directory: 'test-results'
-        discard-paths: no
+  
