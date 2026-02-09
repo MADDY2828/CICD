@@ -16,12 +16,11 @@ phases:
   pre_build:
     commands:
       - echo "Starting pre_build phase"
-      - echo "AWS CLI version: $(aws --version 2>&1)"
       # Determine account id and login to ECR
       - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
       - REPOSITORY_URI=$ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPOSITORY
-      - echo "Repository URI: $REPOSITORY_URI"
+      #- echo "Repository URI: $REPOSITORY_URI"
      
   build:
     commands:
@@ -33,7 +32,7 @@ phases:
 
   post_build:
     commands:
-      - echo "Pushing image to ECR: $REPOSITORY_URI:$IMAGE_TAG"
+      #- echo "Pushing image to ECR: $REPOSITORY_URI:$IMAGE_TAG"
       - docker push $REPOSITORY_URI:$IMAGE_TAG
       - echo "Creating imagedefinitions.json for CodeDeploy/ECS"
       - printf '[{"name":"%s","imageUri":"%s"}]' "$ECR_REPOSITORY" "$REPOSITORY_URI:$IMAGE_TAG" > imagedefinitions.json

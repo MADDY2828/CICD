@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM 771743056694.dkr.ecr.us-east-1.amazonaws.com/node-image:latest
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
